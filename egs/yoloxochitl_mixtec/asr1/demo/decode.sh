@@ -24,6 +24,7 @@ lmexpname=train_rnnlm_pytorch_mixtec_underlying_full_reserve_unigram150
 lmexpdir=exp/${lmexpname}
 expname=train_mixtec_underlying_full_reserve_sp_pytorch_${tag}
 expdir=exp/${expname}
+output_dir=elan
 
 annotation_dir=demo
 sound_dir=demo
