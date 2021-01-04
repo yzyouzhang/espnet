@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright 2020 Johns Hopkins University (Jiatong Shi)
+#  copyright 2020 Johns Hopkins University (Jiatong Shi)
 #  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
 
 . ./path.sh || exit 1;
@@ -99,7 +97,7 @@ if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
             --recog-json ${feat_recog_dir}/split${nj}utt/data_unigram150.JOB.json \
             --result-label ${expdir}/${decode_dir}/data.JOB.json \
             --model ${expdir}/results/${recog_model}
-        #     --rnnlm ${lmexpdir}/rnnlm.model.best
+            --rnnlm ${lmexpdir}/rnnlm.model.best
 
         decode_hyp.sh --bpe 150 --bpemodel ${bpemodel}.model --wer true ${expdir}/${decode_dir} ${dict}
 
@@ -113,7 +111,9 @@ fi
 if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
     echo "stage 4: ELAN Importable Files"
     mkdir -p ${output_dir}
+    decode_dir=decode_${recog_set}_$(basename ${decode_config%.*})_${lmtag}
     python demo/scripts/ElanImport.py data/${recog_set} ${expdir}/${decode_dir}/hyp.wrd.trn ${output_dir}
 fi
 
 echo "Finished all stages"
+
