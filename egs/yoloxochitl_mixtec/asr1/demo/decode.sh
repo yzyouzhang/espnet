@@ -10,6 +10,7 @@
 backend=pytorch
 stage=0        # start from 0 if you need to start from data preparation
 stop_stage=100
+nj=1
 
 # dataset related
 decode_config=conf/decode.yaml
@@ -40,31 +41,30 @@ set -o pipefail
 recog_set="demo"
 
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
+    echo "stage 0: Prepare Data"
     python demo/scripts/data_prep_for_botany_mono_blank.py -a ${annotation_dir} -t data/${recog_set} -s ${sound_dir} -i ${recog_files} --lang mixtec
 fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
-    ### Task dependent. You have to design training and dev sets by yourself.
-    ### But you can utilize Kaldi recipes in most cases
     echo "stage 1: Feature Generation"
     fbankdir=fbank
     # Generate the fbank features; by default 80-dimensional fbanks with pitch on each frame
     for x in ${recog_set}; do
         utils/fix_data_dir.sh data/${x}
-        steps/make_fbank_pitch.sh --cmd "$train_cmd" --nj 16 --write_utt2num_frames true \
+        steps/make_fbank_pitch.sh --cmd "$train_cmd" --nj ${nj} --write_utt2num_frames true \
                                   data/${x} exp/make_fbank/${x} ${fbankdir}
         utils/fix_data_dir.sh data/${x}
     done
     for rtask in ${recog_set}; do
         feat_recog_dir=${dumpdir}/${rtask}/deltafalse; mkdir -p ${feat_recog_dir}
-        dump.sh --cmd "$train_cmd" --nj 16 --do_delta false \
+        dump.sh --cmd "$train_cmd" --nj ${nj} --do_delta false \
                 data/${rtask}/feats.scp data/train_mixtec_underlying_full_reserve_sp/cmvn.ark exp/dump_feats/recog/${rtask} \
                 ${feat_recog_dir}
     done
 fi
 
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
-
+    echo "stage 2: Dump Data for Decoding"
     for rtask in ${recog_set}; do
         feat_recog_dir=${dumpdir}/${rtask}/deltafalse
         data2json.sh --feat ${feat_recog_dir}/feats.scp --bpecode ${bpemodel}.model \
@@ -73,9 +73,9 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 fi
 
 
-if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
-    echo "stage 5: Decoding"
-    nj=16
+if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
+    echo "stage 3: Decoding"
+    nj=${nj}
 
     pids=() # initialize pids
     for rtask in ${recog_set}; do
@@ -100,12 +100,19 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
             --model ${expdir}/results/${recog_model}
         #     --rnnlm ${lmexpdir}/rnnlm.model.best
 
-        score_sclite.sh --bpe 150 --bpemodel ${bpemodel}.model --wer true ${expdir}/${decode_dir} ${dict}
+        decode_hyp.sh --bpe 150 --bpemodel ${bpemodel}.model --wer true ${expdir}/${decode_dir} ${dict}
 
     ) &
     pids+=($!) # store background pids
     done
     i=0; for pid in "${pids[@]}"; do wait ${pid} || ((++i)); done
     [ ${i} -gt 0 ] && echo "$0: ${i} background jobs are failed." && false
-    echo "Finished"
 fi
+
+if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
+    echo "stage 4: ELAN Importable Files"
+    mkdir -p ${output_dir}
+    python demo/scripts/ElanImport.py data/${recog_set} ${expdir}/${decode_dir}/hyp.wrd.trn ${output_dir}
+fi
+
+echo "Finished all stages"
