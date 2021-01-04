@@ -69,7 +69,7 @@ def ELANProcess(afile, langs):
     try:
         elan_content = parse(afile).documentElement
     except:
-        print("encoding failed  %s" % afile)
+        print("encoding failed  %s, the eaf file has some format issues" % afile)
         return None
     time_order = TimeOrderProcess(elan_content.getElementsByTagName("TIME_ORDER")[0])
     tiers = elan_content.getElementsByTagName("TIER")
@@ -136,11 +136,11 @@ def TraverseData(annotation_dir, sound_dir, target_dir, speaker_info, langs):
         if afile == "error":
             continue
         if afile not in sound_files.keys():
-            print("key error {}".format(afile))
+            print("not found wav files for {}".format(afile))
             continue
         segment_info = ELANProcess(afile_path, langs)
         if segment_info is None or segment_info == {}:
-            print("no segment found for {}".format(afile))
+            print("no segment found for {}\n".format(afile) + "Please make sure the TIER's name is set to 'ASR'")
             continue
 
         print("%s sox -t wavpcm \"%s\" -c 1 -r 16000 -b 16 -t wavpcm - |" % (afile, sound_files[afile]), file=wavscp)
