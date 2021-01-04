@@ -163,12 +163,8 @@ def TraverseData(annotation_dir, sound_dir, target_dir, speaker_info, langs):
 
 if __name__ == "__main__":
     parser = ArgumentParser(description='Process Raw data with correction')
-    # parser.add_argument('-a', dest="ann_path", type=str, help="annotation path", default="/export/c04/jiatong/data/Yoloxochitl-Mixtec-for-ASR/YM-comparisons-2-speakers")
-    # parser.add_argument('-a', dest="ann_path", type=str, help="annotation path", default="/export/c04/jiatong/data/Yoloxochitl-Mixtec-for-ASR/Field-botany-mono-blank/botany-mono-new-spanish_tag")
     parser.add_argument('-a', dest="ann_path", type=str, help="annotation path", default="/export/c04/jiatong/data/Yoloxochitl-Mixtec-for-ASR/Field-biology-mono-new-transcription")
-    # parser.add_argument('-t', dest="target_dir", type=str, help='target_dir', default="data/botany_mono_blank_mixtec_only")
     parser.add_argument('-t', dest="target_dir", type=str, help='target_dir', default="data/botany_mono_121_blank_mixtec_only")
-    # parser.add_argument('-s', dest="sound_dir", type=str, help="sound dir", default="/export/c04/jiatong/data/Yoloxochitl-Mixtec-for-ASR/Field-botany-mono-blank/botany-mono-new")
     parser.add_argument('-s', dest="sound_dir", type=str, help="sound dir", default="/export/c04/jiatong/data/Yoloxochitl-Mixtec-for-ASR/Field-biology-mono-new-transcription")
     parser.add_argument('-i', dest='speaker_info', type=str, help='speaker info file dir', default='local/blank_files.csv')
     parser.add_argument('--lang', type=str, help="language type", default="mixtec")

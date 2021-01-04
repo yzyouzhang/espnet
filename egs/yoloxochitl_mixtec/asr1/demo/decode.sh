@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2017 Johns Hopkins University (Shinji Watanabe)
+# Copyright 2020 Johns Hopkins University (Jiatong Shi)
 #  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
 
 . ./path.sh || exit 1;
@@ -12,18 +12,21 @@ stage=0        # start from 0 if you need to start from data preparation
 stop_stage=100
 
 # dataset related
-annotation_id=ixtec_underlying_full_reserve
-
 decode_config=conf/decode.yaml
-
 lmtag=mixtec_underlying_full_reserve        # tag for managing LMs
-
-# decoding parameter
 recog_model=model.acc.best # set a model to be used for decoding: 'model.acc.best' or 'model.loss.best'
-
 dumpdir=dump   # directory to dump full features
-
 tag=mixtec_underlying_full_reserve-conformer-specaug-sp
+dict=data/lang_char/train_mixtec_underlying_full_reserve_sp_unigram150_units.txt
+bpemodel=data/lang_char/train_mixtec_underlying_full_reserve_sp_unigram150
+lmexpname=train_rnnlm_pytorch_mixtec_underlying_full_reserve_unigram150
+lmexpdir=exp/${lmexpname}
+expname=train_mixtec_underlying_full_reserve_sp_pytorch_${tag}
+expdir=exp/${expname}
+
+annotation_dir=demo
+sound_dir=demo
+recog_files=demo/blank_files.csv
 
 . utils/parse_options.sh || exit 1;
 
@@ -34,10 +37,10 @@ set -u
 set -o pipefail
 
 
-recog_set="test_blank"
+recog_set="demo"
 
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
-    
+    python demo/scripts/data_prep_for_botany_mono_blank.py -a ${annotation_dir} -t data/${recog_set} -s ${sound_dir} -i ${recog_files} --lang mixtec
 fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
@@ -60,23 +63,14 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     done
 fi
 
-dict=data/lang_char/train_mixtec_underlying_full_reserve_sp_unigram150_units.txt
-bpemodel=data/lang_char/train_mixtec_underlying_full_reserve_sp_unigram150
-echo "dictionary: ${dict}"
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 
     for rtask in ${recog_set}; do
         feat_recog_dir=${dumpdir}/${rtask}/deltafalse
-        data2json.sh --feat ${feat_recog_dir}/feats.scp --bpecode unigram.model \
+        data2json.sh --feat ${feat_recog_dir}/feats.scp --bpecode ${bpemodel}.model \
                      data/${rtask} ${dict} > ${feat_recog_dir}/data_unigram150.json
     done
 fi
-
-lmexpname=train_rnnlm_pytorch_mixtec_underlying_full_reserve_unigram150
-lmexpdir=exp/${lmexpname}
-
-expname=train_mixtec_underlying_full_reserve_sp_pytorch_${tag}
-expdir=exp/${expname}
 
 
 if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
