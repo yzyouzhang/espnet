@@ -96,7 +96,7 @@ if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
             --batchsize 0 \
             --recog-json ${feat_recog_dir}/split${nj}utt/data_unigram150.JOB.json \
             --result-label ${expdir}/${decode_dir}/data.JOB.json \
-            --model ${expdir}/results/${recog_model}
+            --model ${expdir}/results/${recog_model}  \
             --rnnlm ${lmexpdir}/rnnlm.model.best
 
         decode_hyp.sh --bpe 150 --bpemodel ${bpemodel}.model --wer true ${expdir}/${decode_dir} ${dict}
