@@ -16,7 +16,7 @@ lmtag=elan_p_272_up_466_reserve          # tag for managing LMs
 recog_model=model.acc.best # set a model to be used for decoding: 'model.acc.best' or 'model.loss.best'
 dumpdir=dump   # directory to dump full features
 tag=elan_p_272_up_466_reserve-conformer-specaug-sp
-dict=data/lang_char/train_mixtec_underlying_full_reserve_sp_unigram150_units.txt
+dict=data/lang_char/train_elan_p_272_up_466_reserve_unigram150_units.txt
 bpemodel=data/lang_char/train_elan_p_272_up_466_reserve_sp_unigram150
 lmexpname=train_rnnlm_pytorch_elan_p_272_up_466_reserve_unigram150
 lmexpdir=exp/${lmexpname}
@@ -57,7 +57,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     for rtask in ${recog_set}; do
         feat_recog_dir=${dumpdir}/${rtask}/deltafalse; mkdir -p ${feat_recog_dir}
         dump.sh --cmd "$train_cmd" --nj ${nj} --do_delta false \
-                data/${rtask}/feats.scp data/train_mixtec_underlying_full_reserve_sp/cmvn.ark exp/dump_feats/recog/${rtask} \
+                data/${rtask}/feats.scp data/train_elan_p_272_up_466_reserve_sp/cmvn.ark/cmvn.ark exp/dump_feats/recog/${rtask} \
                 ${feat_recog_dir}
     done
 fi
@@ -66,7 +66,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     echo "stage 2: Dump Data for Decoding"
     for rtask in ${recog_set}; do
         feat_recog_dir=${dumpdir}/${rtask}/deltafalse
-        data2json.sh --feat ${feat_recog_dir}/feats.scp --bpecode ${bpemodel}.model \
+        data2json.sh --feat ${feat_recog_dir}/feats.scp --nj ${nj} --bpecode ${bpemodel}.model \
                      data/${rtask} ${dict} > ${feat_recog_dir}/data_unigram150.json
     done
 fi
