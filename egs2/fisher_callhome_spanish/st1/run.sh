@@ -12,7 +12,8 @@ train_set=train
 train_dev=dev
 test_set="fisher_dev fisher_dev2 fisher_test callhome_devtest callhome_evltest"
 
-st_config=conf/train_st.yaml
+st_config=conf/tuning/train_transformer_st.yaml
+# st_config=conf/train_st.yaml
 inference_config=conf/decode_st.yaml
 
 src_nbpe=500
@@ -22,12 +23,18 @@ src_case=lc.rm
 tgt_case=lc.rm
 
 ./st.sh \
+    --stage 13 \
+    --stop_stage 13 \
+    --st_tag 8k_transformer \
+    --pretrained_asr /projects/tir3/users/jiatongs/st/espnet/egs2/fisher_callhome_spanish/asr1/exp/asr_8k_transformer/valid.acc.ave_10best.pth \
+    --ignore_init_mismatch true \
     --local_data_opts "--stage 0" \
     --audio_format "flac.ark" \
     --use_lm false \
     --token_joint false \
     --nj 40 \
     --inference_nj 8 \
+    --fs 8k \
     --src_lang ${src_lang} \
     --tgt_lang ${tgt_lang} \
     --src_token_type "bpe" \

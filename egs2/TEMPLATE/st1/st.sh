@@ -298,8 +298,12 @@ utt_extra_files="text.${src_case}.${src_lang} text.${tgt_case}.${tgt_lang}"
 # Use the same text as ST for bpe training if not specified.
 if "${token_joint}"; then
     # if token_joint, the bpe training will use both src_lang and tgt_lang to train a single bpe model
-    # TODO (prepare data as text.${src_lang}_${tgt_lang})
-    [ -z "${tgt_bpe_train_text}" ] && tgt_bpe_train_text="${data_feats}/${train_set}/text.${src_lang}_${tgt_lang}"
+    [ -z "${src_bpe_train_text}" ] && src_bpe_train_text="${data_feats}/${train_set}/text.${src_case}.${src_lang}"
+    [ -z "${tgt_bpe_train_text}" ] && tgt_bpe_train_text="${data_feats}/${train_set}/text.${tgt_case}.${tgt_lang}"
+
+    # Prepare data as text.${src_lang}_${tgt_lang})
+    cat $src_bpe_train_text $tgt_bpe_train_text > ${data_feats}/${train_set}/text.${src_lang}_${tgt_lang}
+    tgt_bpe_train_text="${data_feats}/${train_set}/text.${src_lang}_${tgt_lang}"
 else
     [ -z "${src_bpe_train_text}" ] && src_bpe_train_text="${data_feats}/${train_set}/text.${src_case}.${src_lang}"
     [ -z "${tgt_bpe_train_text}" ] && tgt_bpe_train_text="${data_feats}/${train_set}/text.${tgt_case}.${tgt_lang}"
@@ -1193,6 +1197,17 @@ if ! "${skip_train}"; then
 
 
     if [ ${stage} -le 11 ] && [ ${stop_stage} -ge 11 ]; then
+
+tempdir=$(mktemp -d "/tmp/st_jiatong-$$.XXXXXXXX")
+trap 'rm -rf ${tempdir}' EXIT
+cp -r "${data_feats}" ${tempdir}
+# or rsync -zav --progress --bwlimit=100 "${data_feats}" ${tempdir}
+data_feats="${tempdir}/$(basename ${data_feats})"
+scp_lists=$(find ${tempdir} -type f -name "*.scp")
+for f in ${scp_lists}; do
+    sed -i -e "s/${dumpdir//\//\\/}/${tempdir//\//\\/}/g" $f
+done
+
         _st_train_dir="${data_feats}/${train_set}"
         _st_valid_dir="${data_feats}/${valid_set}"
         log "Stage 11: ST Training: train_set=${_st_train_dir}, valid_set=${_st_valid_dir}"
@@ -1484,24 +1499,24 @@ if ! "${skip_eval}"; then
             detokenizer.perl -l en -q < "${_scoredir}/hyp.trn" > "${_scoredir}/hyp.trn.detok"
 
             if [ ${tgt_case} = "tc" ]; then
-                echo "Case sensitive BLEU result (single-reference)" >> ${_scoredir}/result.tc.txt
+                echo "Case sensitive BLEU result (single-reference)" >> ${_scoredir}/result.tc.single.txt
                 sacrebleu "${_scoredir}/ref.trn.detok" \
                           -i "${_scoredir}/hyp.trn.detok" \
                           -m bleu chrf ter \
-                          >> ${_scoredir}/result.tc.txt
+                          >> ${_scoredir}/result.tc.single.txt
                 
-                log "Write a case-sensitive BLEU (single-reference) result in ${_scoredir}/result.tc.txt"
+                log "Write a case-sensitive BLEU (single-reference) result in ${_scoredir}/result.tc.single.txt"
             fi
 
             # detokenize & remove punctuation except apostrophe
             remove_punctuation.pl < "${_scoredir}/ref.trn.detok" > "${_scoredir}/ref.trn.detok.lc.rm"
             remove_punctuation.pl < "${_scoredir}/hyp.trn.detok" > "${_scoredir}/hyp.trn.detok.lc.rm"
-            echo "Case insensitive BLEU result (single-reference)" >> ${_scoredir}/result.lc.txt
+            echo "Case insensitive BLEU result (single-reference)" >> ${_scoredir}/result.lc.single.txt
             sacrebleu -lc "${_scoredir}/ref.trn.detok.lc.rm" \
                       -i "${_scoredir}/hyp.trn.detok.lc.rm" \
                       -m bleu chrf ter \
-                      >> ${_scoredir}/result.lc.txt
-            log "Write a case-insensitve BLEU (single-reference) result in ${_scoredir}/result.lc.txt"
+                      >> ${_scoredir}/result.lc.single.txt
+            log "Write a case-insensitve BLEU (single-reference) result in ${_scoredir}/result.lc.single.txt"
 
             # process multi-references cases
             multi_references=$(ls "${_data}/text.${tgt_case}.${tgt_lang}".* || echo "")
@@ -1531,24 +1546,24 @@ if ! "${skip_eval}"; then
                 done
 
                 if [ ${tgt_case} = "tc" ]; then
-                    echo "Case sensitive BLEU result (multi-references)" >> ${_scoredir}/result.tc.txt
+                    echo "Case sensitive BLEU result (multi-references)" >> ${_scoredir}/result.multi.tc.txt
                     sacrebleu ${case_sensitive_refs} \
                         -i ${_scoredir}/hyp.trn.detok.lc.rm -m bleu chrf ter \
-                        >> ${_scoredir}/result.tc.txt
-                    log "Write a case-sensitve BLEU (multi-reference) result in ${_scoredir}/result.tc.txt"
+                        >> ${_scoredir}/result.tc.multi.txt
+                    log "Write a case-sensitve BLEU (multi-reference) result in ${_scoredir}/result.tc.multi.txt"
                 fi
 
-                echo "Case insensitive BLEU result (multi-references)" >> ${_scoredir}/result.lc.txt
+                echo "Case insensitive BLEU result (multi-references)" >> ${_scoredir}/result.lc.multi.txt
                 sacrebleu -lc ${case_insensitive_refs} \
                     -i ${_scoredir}/hyp.trn.detok.lc.rm -m bleu chrf ter \
-                    >> ${_scoredir}/result.lc.txt
-                log "Write a case-insensitve BLEU (multi-reference) result in ${_scoredir}/result.lc.txt"
+                    >> ${_scoredir}/result.lc.multi.txt
+                log "Write a case-insensitve BLEU (multi-reference) result in ${_scoredir}/result.lc.multi.txt"
             fi
         done
 
         # Show results in Markdown syntax
-        scripts/utils/show_st_result.sh --case $tgt_case "${st_exp}" > "${st_exp}"/RESULTS.md
-        cat "${cat_exp}"/RESULTS.md
+        scripts/utils/show_translation_result.sh --case $tgt_case "${st_exp}" > "${st_exp}"/RESULTS.md
+        cat "${st_exp}"/RESULTS.md
     fi
 else
     log "Skip the evaluation stages"

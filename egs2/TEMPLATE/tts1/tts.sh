@@ -232,7 +232,7 @@ else
 fi
 
 # Check token list type
-token_listdir="${dumpdir}/token_list/${token_type}"
+token_listdir="${dumpdir}/token_list/${token_type}_vowel"
 if [ "${cleaner}" != none ]; then
     token_listdir+="_${cleaner}"
 fi
@@ -684,8 +684,18 @@ if ! "${skip_train}"; then
             >"${tts_stats_dir}/valid/text_shape.${token_type}"
     fi
 
-
     if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
+tempdir=$(mktemp -d "/tmp/st_jiatong-$$.XXXXXXXX")
+trap 'rm -rf ${tempdir}' EXIT
+cp -r "${data_feats}" ${tempdir}
+# or rsync -zav --progress --bwlimit=100 "${data_feats}" ${tempdir}
+data_feats="${tempdir}/$(basename ${data_feats})"
+scp_lists=$(find ${tempdir} -type f -name "*.scp")
+for f in ${scp_lists}; do
+    sed -i -e "s/${dumpdir//\//\\/}/${tempdir//\//\\/}/g" $f
+done
+
+
         _train_dir="${data_feats}/${train_set}"
         _valid_dir="${data_feats}/${valid_set}"
         log "Stage 6: TTS Training: train_set=${_train_dir}, valid_set=${_valid_dir}"
@@ -703,7 +713,12 @@ if ! "${skip_train}"; then
             #####################################
             _scp=wav.scp
             # "sound" supports "wav", "flac", etc.
-            _type=sound
+            if [[ "${audio_format}" == *ark* ]]; then
+                _type=kaldi_ark
+            else
+                # "sound" supports "wav", "flac", etc.
+                _type=sound
+            fi
             _fold_length="$((speech_fold_length * n_shift))"
             _opts+="--feats_extract ${feats_extract} "
             _opts+="--feats_extract_conf n_fft=${n_fft} "
@@ -780,7 +795,12 @@ if ! "${skip_train}"; then
             else
                 # Teacher forcing case: use groundtruth as the target
                 _scp=wav.scp
-                _type=sound
+                if [[ "${audio_format}" == *ark* ]]; then
+                    _type=kaldi_ark
+                else
+                    # "sound" supports "wav", "flac", etc.
+                    _type=sound
+                fi
                 _fold_length="$((speech_fold_length * n_shift))"
                 _opts+="--feats_extract ${feats_extract} "
                 _opts+="--feats_extract_conf n_fft=${n_fft} "

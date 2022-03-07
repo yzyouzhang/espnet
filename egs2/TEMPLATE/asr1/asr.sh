@@ -476,7 +476,8 @@ if ! "${skip_data_prep}"; then
             # If nothing is need, then format_wav_scp.sh does nothing:
             # i.e. the input file format and rate is same as the output.
 
-            for dset in "${train_set}" "${valid_set}" ${test_sets}; do
+            # for dset in "${train_set}" "${valid_set}" ${test_sets}; do
+            for dset in "${valid_set}" ${test_sets}; do
                 if [ "${dset}" = "${train_set}" ] || [ "${dset}" = "${valid_set}" ]; then
                     _suf="/org"
                 else
@@ -1004,6 +1005,17 @@ if ! "${skip_train}"; then
 
 
     if [ ${stage} -le 11 ] && [ ${stop_stage} -ge 11 ]; then
+tempdir=$(mktemp -d "/tmp/alt_jiatong-$$.XXXXXXXX")
+trap 'rm -rf ${tempdir}' EXIT
+cp -r "${data_feats}" ${tempdir}
+# or rsync -zav --progress --bwlimit=100 "${data_feats}" ${tempdir}
+data_feats="${tempdir}/$(basename ${data_feats})"
+scp_lists=$(find ${tempdir} -type f -name "*.scp")
+for f in ${scp_lists}; do
+    sed -i -e "s/${dumpdir//\//\\/}/${tempdir//\//\\/}/g" $f
+done
+
+
         _asr_train_dir="${data_feats}/${train_set}"
         _asr_valid_dir="${data_feats}/${valid_set}"
         log "Stage 11: ASR Training: train_set=${_asr_train_dir}, valid_set=${_asr_valid_dir}"
