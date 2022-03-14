@@ -33,6 +33,7 @@ from espnet2.utils import config_argparse
 from espnet2.utils.types import str2bool
 from espnet2.utils.types import str2triple_str
 from espnet2.utils.types import str_or_none
+from espnet2.bin.st_md_inference import inference_md
 
 
 class Speech2Text:
@@ -445,10 +446,49 @@ def get_parser():
 
     group = parser.add_argument_group("The model configuration related")
     group.add_argument(
-        "--st_train_config", type=str, help="ST training configuration", action="append"
+        "--use_multidecoder",
+        type=str2bool,
+        default=False,
+        help="Use multidecoder model",
+    )
+    group.add_argument(
+        "--st_train_config",
+        type=str,
+        help="ST training configuration",
+        action="append",
     )
     group.add_argument(
         "--st_model_file", type=str, help="ST model parameter file", action="append"
+    )
+    group.add_argument(
+        "--mt_train_config",
+        type=str,
+        help="MT training configuration",
+    )
+    group.add_argument(
+        "--mt_file",
+        type=str,
+        help="MT parameter file",
+    )
+    group.add_argument(
+        "--md_asr_train_config",
+        type=str,
+        help="MD ASR training configuration",
+    )
+    group.add_argument(
+        "--md_asr_file",
+        type=str,
+        help="MD ASR parameter file",
+    )
+    group.add_argument(
+        "--md_lm_train_config",
+        type=str,
+        help="MD LM training configuration",
+    )
+    group.add_argument(
+        "--md_lm_file",
+        type=str,
+        help="MD LM parameter file",
     )
     group.add_argument(
         "--lm_train_config",
@@ -512,6 +552,38 @@ def get_parser():
     group.add_argument("--lm_weight", type=float, default=1.0, help="RNNLM weight")
     group.add_argument("--ngram_weight", type=float, default=0.9, help="ngram weight")
 
+    group = parser.add_argument_group("MD Intermediate-search related")
+    group.add_argument(
+        "--md_nbest", type=int, default=1, help="Output N-best hypotheses"
+    )
+    group.add_argument("--md_beam_size", type=int, default=20, help="Beam size")
+    group.add_argument(
+        "--md_penalty", type=float, default=0.0, help="Insertion penalty"
+    )
+    group.add_argument(
+        "--md_maxlenratio",
+        type=float,
+        default=0.0,
+        help="Input length ratio to obtain max output length. "
+        "If maxlenratio=0.0 (default), it uses a end-detect "
+        "function "
+        "to automatically find maximum hypothesis lengths."
+        "If maxlenratio<0.0, its absolute value is interpreted"
+        "as a constant max output length",
+    )
+    group.add_argument(
+        "--md_minlenratio",
+        type=float,
+        default=0.0,
+        help="Input length ratio to obtain min output length",
+    )
+    group.add_argument(
+        "--md_ctc_weight", type=float, default=0.5, help="CTC weight in joint decoding"
+    )
+    group.add_argument("--md_lm_weight", type=float, default=0.0, help="RNNLM weight")
+    group.add_argument("--md_asr_weight", type=float, default=0.0, help="MD ASR weight")
+    group.add_argument("--mt_weight", type=float, default=0.0, help="MD MT weight")
+
     group = parser.add_argument_group("Text converter related")
     group.add_argument(
         "--token_type",
@@ -538,7 +610,11 @@ def main(cmd=None):
     args = parser.parse_args(cmd)
     kwargs = vars(args)
     kwargs.pop("config", None)
-    inference(**kwargs)
+    if kwargs["use_multidecoder"]:
+        kwargs.pop("use_multidecoder", None)
+        inference_md(**kwargs)
+    else:
+        inference(**kwargs)
 
 
 if __name__ == "__main__":

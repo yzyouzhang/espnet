@@ -89,6 +89,7 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
         else:
             self.output_layer = None
 
+        self._output_size_bf_softmax = attention_dim
         # Must set by the inheritance
         self.decoders = None
 
@@ -98,6 +99,7 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
         hlens: torch.Tensor,
         ys_in_pad: torch.Tensor,
         ys_in_lens: torch.Tensor,
+        return_hidden: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward decoder.
 
@@ -128,6 +130,12 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
         memory_mask = (~make_pad_mask(hlens, maxlen=memory.size(1)))[:, None, :].to(
             memory.device
         )
+        # Padding for Longformer
+        if memory_mask.shape[-1] != memory.shape[1]:
+            padlen = memory.shape[1] - memory_mask.shape[-1]
+            memory_mask = torch.nn.functional.pad(
+                memory_mask, (0, padlen), "constant", False
+            )
 
         x = self.embed(tgt)
         x, tgt_mask, memory, memory_mask = self.decoders(
@@ -135,11 +143,20 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
         )
         if self.normalize_before:
             x = self.after_norm(x)
+            if return_hidden:
+                hs_asr = x
         if self.output_layer is not None:
             x = self.output_layer(x)
 
         olens = tgt_mask.sum(1)
+
+        if return_hidden:
+            return x, olens, hs_asr
+
         return x, olens
+
+    def output_size_bf_softmax(self) -> int:
+        return self._output_size_bf_softmax
 
     def forward_one_step(
         self,
@@ -147,6 +164,7 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
         tgt_mask: torch.Tensor,
         memory: torch.Tensor,
         cache: List[torch.Tensor] = None,
+        return_hidden: bool = False,
     ) -> Tuple[torch.Tensor, List[torch.Tensor]]:
         """Forward one step.
 
@@ -175,21 +193,44 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
             y = self.after_norm(x[:, -1])
         else:
             y = x[:, -1]
+
+        if return_hidden:
+            h_asr = y
+
         if self.output_layer is not None:
             y = torch.log_softmax(self.output_layer(y), dim=-1)
 
+        if return_hidden:
+            return y, h_asr, new_cache
         return y, new_cache
 
-    def score(self, ys, state, x):
+    def score(self, ys, state, x, return_hidden=False):
         """Score."""
         ys_mask = subsequent_mask(len(ys), device=x.device).unsqueeze(0)
+        if return_hidden:
+            logp, state = self.forward_one_step(
+                ys.unsqueeze(0),
+                ys_mask,
+                x.unsqueeze(0),
+                cache=state,
+                return_hidden=return_hidden,
+            )
+            return logp.squeeze(0), hs, state
+
         logp, state = self.forward_one_step(
-            ys.unsqueeze(0), ys_mask, x.unsqueeze(0), cache=state
+            ys.unsqueeze(0),
+            ys_mask,
+            x.unsqueeze(0),
+            cache=state,
         )
         return logp.squeeze(0), state
 
     def batch_score(
-        self, ys: torch.Tensor, states: List[Any], xs: torch.Tensor
+        self,
+        ys: torch.Tensor,
+        states: List[Any],
+        xs: torch.Tensor,
+        return_hidden: bool = False,
     ) -> Tuple[torch.Tensor, List[Any]]:
         """Score new token batch.
 
@@ -219,6 +260,18 @@ class BaseTransformerDecoder(AbsDecoder, BatchScorerInterface):
 
         # batch decoding
         ys_mask = subsequent_mask(ys.size(-1), device=xs.device).unsqueeze(0)
+
+        if return_hidden:
+            logp, hs, states = self.forward_one_step(
+                ys, ys_mask, xs, cache=batch_state, return_hidden=return_hidden
+            )
+
+            # transpose state of [layer, batch] into [batch, layer]
+            state_list = [
+                [states[i][b] for i in range(n_layers)] for b in range(n_batch)
+            ]
+            return logp, hs, state_list
+
         logp, states = self.forward_one_step(ys, ys_mask, xs, cache=batch_state)
 
         # transpose state of [layer, batch] into [batch, layer]
