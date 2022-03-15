@@ -305,6 +305,7 @@ def inference(
     token_type: Optional[str],
     bpemodel: Optional[str],
     allow_variable_data_keys: bool,
+    **kwargs,
 ):
     assert check_argument_types()
     if batch_size > 1:

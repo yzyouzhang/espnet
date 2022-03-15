@@ -1423,10 +1423,10 @@ if ! "${skip_eval}"; then
 
         if "${use_ensemble}"; then
             for config in "${additional_st_train_config}"; do
-                _opts+="--st_train_config ${config}"
+                _opts+="--st_train_config ${config} "
             done
             for model in "${additional_st_model_file}"; do
-                _opts+="--st_model_file ${model}"
+                _opts+="--st_model_file ${model} "
             done
         fi
         
