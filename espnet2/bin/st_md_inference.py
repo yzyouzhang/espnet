@@ -96,22 +96,34 @@ class Speech2Text:
         scorers = {}
         asr_scorers = {}
 
-        st_model, st_train_args = STTask.build_model_from_file(
-            st_train_config, st_model_file, device
-        )
+        if type(st_model_file) == list:
+            st_model, st_train_args = STTask.build_model_combination(
+                st_train_config, st_model_file, device
+            )
+            token_list = st_model.single_model.token_list
+        else:
+            st_model, st_train_args = STTask.build_model_from_file(
+                st_train_config, st_model_file, device
+            )
+            token_list = st_model.token_list
         st_model.to(dtype=getattr(torch, dtype)).eval()
 
         decoder = st_model.decoder
-        if isinstance(decoder, TransformerMDDecoder):
-            self.speech_attn = True
+        self.speech_attn = []
+        for d in decoder.decoders:
+            if isinstance(d, TransformerMDDecoder):
+                self.speech_attn.append(True)
+            else:
+                self.speech_attn.append(False)
+
         asr_decoder = st_model.asr_decoder
-        token_list = st_model.token_list
+
         if getattr(st_model, "src_token_list", None) is None:
             src_token_list = st_train_args.src_token_list
         else:
             src_token_list = st_model.src_token_list
 
-        asr_ctc = CTCPrefixScorer(ctc=st_model.ctc, eos=st_model.src_eos)
+        asr_ctc = st_model.ctc
         asr_scorers.update(
             decoder=asr_decoder,
             ctc=asr_ctc,
@@ -418,13 +430,17 @@ class Speech2Text:
         asr_hs_lengths = asr_hs.new_full(
             [1], dtype=torch.long, fill_value=asr_hs.size(1)
         )
-        enc_mt, enc_mt_lengths, _ = self.st_model.encoder_mt(asr_hs, asr_hs_lengths)
-        if self.speech_attn:
-            x = enc[0]
-            md_x = enc_mt[0]
-        else:
-            x = enc_mt[0]
-            md_x = None
+        enc_mt, enc_mt_lengths = self.st_model.encoder_mt(asr_hs, asr_hs_lengths)
+
+        x = []
+        md_x = []
+        for i in range(self.st_model.model_num):
+            if self.speech_attn[i]:
+                x.append(enc[0])
+                md_x.append(enc_mt[0])
+            else:
+                x.append(enc_mt[0])
+                md_x.append(None)
 
         mt_x = None
         if self.mt_model is not None:

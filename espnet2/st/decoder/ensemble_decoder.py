@@ -6,6 +6,7 @@ from typing import Any
 from typing import List
 from typing import Tuple
 from typing import Union
+from typing import Optional
 
 import numpy as np
 import torch
@@ -32,11 +33,16 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         super().__init__()
         assert len(decoders) > 0, "At least one decoder is needed for ensembling"
 
+        # Note (jiatong): an invalid index to skip some decoder
+        # (useful when some decoders are none)
+        self.valid = 0
+        for decoder in decoders:
+            if decoder is not None:
+                self.valid += 1
+
         # Note (jiatong): different from other'decoders
         self.decoders = torch.nn.ModuleList(decoders)
-        self.weights = (
-            [1 / len(decoders)] * len(decoders) if weights is None else weights
-        )
+        self.weights = [1 / self.valid] * self.valid if weights is None else weights
 
     def init_state(self, x: torch.Tensor) -> Any:
         """Get an initial state for decoding (optional).
@@ -45,7 +51,7 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
             x (torch.Tensor): The encoded feature tensor
         Returns: initial state
         """
-        return [None] * len(self.decoders)
+        return [None for i in range(len(self.decoders))]
 
     def batch_init_state(self, x: torch.Tensor) -> Any:
         """Get an initial state for decoding (optional).
@@ -58,15 +64,20 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
 
     def forward(
         self,
-        hs_pad: torch.Tensor,
-        hlens: torch.Tensor,
+        hs_pad: List[torch.Tensor],
+        hlens: List[torch.Tensor],
         ys_in_pad: torch.Tensor,
         ys_in_lens: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Dummy forward"""
-        pass
+        # FIXME (jiatong): currently only select one decoder to perform forward
+        for i in range(len(self.decoders)):
+            if self.decoders[i] is not None:
+                return self.decoders[i](
+                    hs_pad[i], hlens[i], ys_in_pad, ys_in_lens, return_hidden=True
+                )
 
-    def score(self, ys, state, x):
+    def score(self, ys, state, x, speech=None):
         """Score."""
         assert len(x) == len(
             self.decoders
@@ -74,12 +85,13 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         logps = []
         states = []
         for i in range(len(self.decoders)):
-            ys_mask = subsequent_mask(len(ys), device=x[i].device).unsqueeze(0)
-            sub_state = None if state is None else state[i]
-            logp, sub_state = self.decoders[i].forward_one_step(
-                ys.unsqueeze(0), ys_mask, x[i].unsqueeze(0), cache=sub_state
-            )
-            logps.append(np.log(self.weights[i]) * logp.squeeze(0))
+            if self.decoders[i] is None:
+                continue
+            if speech is not None and speech[i] is not None:
+                logp, sub_state = self.decoders[i].score(ys, state[i], x[i], speech[i])
+            else:
+                logp, sub_state = self.decoders[i].score(ys, state[i], x[i])
+            logps.append(np.log(self.weights[i]) + logp.squeeze(0))
             states.append(sub_state)
         return torch.logsumexp(torch.stack(logps, dim=0), dim=0), states
 
@@ -88,6 +100,7 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         ys: torch.Tensor,
         states: List[Any],
         xs: Union[torch.Tensor, List[torch.Tensor]],
+        speech: Optional[Union[torch.Tensor, List[torch.Tensor]]] = None,
     ) -> Tuple[torch.Tensor, List[Any]]:
         """Score new token batch.
 
@@ -107,15 +120,30 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         all_state_list = []
         logps = []
         for i in range(n_decoders):
+            if self.decoders[i] is None:
+                all_state_list.append(None)
+                continue
             decoder_batch = [states[h][i] for h in range(n_batch)]
-            logp, state_list = self.decoders[i].batch_score(ys, decoder_batch, xs[i])
+            if speech is not None and speech[i] is not None:
+                logp, state_list = self.decoders[i].batch_score(
+                    ys, decoder_batch, xs[i]
+                )
+            else:
+                logp, state_list = self.decoders[i].batch_score(
+                    ys, decoder_batch, xs[i], speech[i]
+                )
             all_state_list.append(state_list)
             logps.append(np.log(self.weights[i]) + logp)
         score = torch.logsumexp(torch.stack(logps, dim=0), dim=0)
 
         transpose_state_list = []
         for i in range(n_batch):
-            transpose_state_list.append(
-                [all_state_list[j][i] for j in range(n_decoders)]
-            )
+            decoder_state = []
+            for j in range(n_decoders):
+                if all_state_list[j] is not None:
+                    decoder_state.append(all_state_list[j][i])
+                else:
+                    decoder_state.append(None)
+            transpose_state_list.append(decoder_state)
+
         return score, transpose_state_list
