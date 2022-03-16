@@ -50,6 +50,7 @@ class EnsembleCTC(BatchPartialScorerInterface):
         Returns: initial state
 
         """
+
         initial_states = []
         for i in range(self.ctc_num):
             if self.ctc[i] is None:
