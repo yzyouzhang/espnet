@@ -68,8 +68,8 @@ class ESPnetSTEnsemble(AbsESPnetModel):
             else:
                 ctcs.append(None)
 
-        self.decoder = EnsembleDecoder(decoders)
-        self.asr_decoder = EnsembleDecoder(asr_decoders)
+        self.decoder = EnsembleDecoder(decoders, return_hidden=False)
+        self.asr_decoder = EnsembleDecoder(asr_decoders, return_hidden=True)
         self.ctc = EnsembleCTC(ctcs, self.src_eos)
 
     def forward(
