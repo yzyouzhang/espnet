@@ -128,10 +128,14 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
                 all_state_list.append(None)
                 continue
             decoder_batch = [states[h][i] for h in range(n_batch)]
-            if speech is not None and speech[i] is not None:
+            if speech is not None and xs[i] is not None:
                 # in these case, there will be no return hidden considered
                 logp, state_list = self.decoders[i].batch_score(
                     ys, decoder_batch, xs[i], speech[i]
+                )
+            elif xs[i] is None: # the case where baseST used for MD ensemble
+                logp, state_list = self.decoders[i].batch_score(
+                    ys, decoder_batch, speech[i]
                 )
             else:
                 logp, state_list = self.decoders[i].batch_score(

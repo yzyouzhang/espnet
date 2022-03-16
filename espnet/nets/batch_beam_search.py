@@ -269,7 +269,10 @@ class BatchBeamSearch(BeamSearch):
         part_ids = None  # no pre-beam
 
         if md_x is not None:
-            md_x = md_x.expand(n_batch, *md_x.shape)
+            if type(md_x) == list:
+                md_x = [h.expand(n_batch, *h.shape) if h is not None else None for h in md_x]
+            else:
+                md_x = md_x.expand(n_batch, *md_x.shape)
 
         if md_asr_x is not None:
             md_asr_x = md_asr_x.expand(n_batch, *md_asr_x.shape)

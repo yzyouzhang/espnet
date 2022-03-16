@@ -115,7 +115,7 @@ class Speech2Text:
         self.type = []
         for i in range(st_model.model_num):
             if isinstance(st_model.models[i], ESPnetSTMDModel):
-                if isinstance(decoder[i], TransformerMDDecoder):
+                if isinstance(decoder.decoders[i], TransformerMDDecoder):
                     self.type.append("MultiDecoder-SpeechAttn")
                 else:
                     self.type.append("MultiDecoder")
@@ -459,6 +459,7 @@ class Speech2Text:
                 md_x.append(None)
             elif self.type[i] == "BaseST":
                 x.append(enc[i])
+                md_x.append(None)
 
         mt_x = None
         if self.mt_model is not None:
