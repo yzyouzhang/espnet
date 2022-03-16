@@ -115,6 +115,7 @@ class ESPnetSTEnsemble(AbsESPnetModel):
         self, asr_hs: torch.Tensor, asr_hs_lengths: torch.Tensor
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         # TODO (jiatong) add function description
+        # assume only one asr
         encoder_out = []
         encoder_out_lens = []
 
@@ -124,7 +125,6 @@ class ESPnetSTEnsemble(AbsESPnetModel):
                     asr_hs, asr_hs_lengths
                 )
             else:
-                logging.info("type not match")
                 single_encoder_out, single_encoder_out_lens = None, None
             encoder_out.append(single_encoder_out)
             encoder_out_lens.append(single_encoder_out_lens)

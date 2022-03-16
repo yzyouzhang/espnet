@@ -362,6 +362,8 @@ class Speech2Text:
         enc, enc_lens = self.st_model.encode(**batch)
         # assert len(enc) == 1, len(enc)
 
+        selected_encoder_id = self.st_model.asr_decoder_index
+        assert len(enc[selected_encoder_id]) == 1, len(enc[selected_encoder_id])
         if src_text is not None:
             # data: (Nsamples,) -> (1, Nsamples)
             src_text = src_text.unsqueeze(0)
@@ -376,7 +378,7 @@ class Speech2Text:
             )
             src_text_in_lens = src_text_lengths + 1
             decoder_out, _, hs_dec_asr = self.st_model.asr_decoder(
-                enc, enc_lens, src_text_in, src_text_in_lens, return_hidden=True
+                enc[selected_encoder_id], enc_lens[selected_encoder_id], src_text_in, src_text_in_lens, return_hidden=True
             )
             ys_hat = decoder_out.argmax(dim=-1)
             asr_nbest_hyps = [
@@ -396,8 +398,6 @@ class Speech2Text:
                 md_asr_x = asr_enc[0]
 
             # c. Passed the encoder result and the beam search
-            selected_encoder_id = self.st_model.asr_decoder_index
-            assert len(enc[selected_encoder_id]) == 1, len(enc[selected_encoder_id])
             x = enc[selected_encoder_id][0]
 
             asr_nbest_hyps = self.asr_beam_search(
@@ -452,13 +452,13 @@ class Speech2Text:
         for i in range(self.st_model.model_num):
             assert len(enc[i]) == 1, len(enc[i])
             if self.type[i] == "MultiDecoder-SpeechAttn":
-                x.append(enc[i])
-                md_x.append(enc_mt[i])
+                x.append(enc[i][0])
+                md_x.append(enc_mt[i][0])
             elif self.type[i] == "MultiDecoder" or self.type[i] == "BaseMT":
-                x.append(enc_mt[i])
+                x.append(enc_mt[i][0])
                 md_x.append(None)
             elif self.type[i] == "BaseST":
-                x.append(enc[i])
+                x.append(enc[i][0])
                 md_x.append(None)
 
         mt_x = None
