@@ -8,6 +8,7 @@ from typing import Optional
 from typing import Sequence
 from typing import Tuple
 from typing import Union
+from espnet2.asr.decoder.transformer_decoder import TransformerDecoder
 
 import numpy as np
 import torch
@@ -22,7 +23,9 @@ from espnet.nets.pytorch_backend.transformer.add_sos_eos import add_sos_eos
 from espnet.nets.pytorch_backend.transformer.subsampling import TooShortUttError
 from espnet.nets.scorer_interface import BatchScorerInterface
 from espnet.nets.scorers.length_bonus import LengthBonus
-from espnet.nets.scorers.ctc import CTCPrefixScorer
+from espnet2.st.espnet_model import ESPnetSTModel
+from espnet2.st.espnet_model_md import ESPnetSTMDModel
+from espnet2.mt.espnet_model import ESPnetMTModel
 from espnet2.st.decoder.transformer_md_decoder import TransformerMDDecoder
 from espnet.utils.cli_utils import get_commandline_args
 from espnet2.fileio.datadir_writer import DatadirWriter
@@ -109,13 +112,19 @@ class Speech2Text:
         st_model.to(dtype=getattr(torch, dtype)).eval()
 
         decoder = st_model.decoder
-        self.speech_attn = []
-        for d in decoder.decoders:
-            if isinstance(d, TransformerMDDecoder):
-                self.speech_attn.append(True)
+        self.type = []
+        for i in range(len(st_model.model_num):
+            if isinstance(self.st_model.models[i], ESPnetSTMDModel):
+                if isinstance(self.decoders[i], TransformerMDDecoder):
+                    self.type.append("MultiDecoder-SpeechAttn")
+                else:
+                    self.type.append("MultiDecoder")
+            elif isinstance(self.st_model.models[i], ESPnetSTModel):
+                self.type.append("BaseST")
+            elif isinstance(self.st_model.models[i], ESPnetMTModel):
+                self.type.append("BaseMT")
             else:
-                self.speech_attn.append(False)
-
+                raise ValueError("Not supported model type {}".format(type(self.st_model.models[i])))
         asr_decoder = st_model.asr_decoder
 
         if getattr(st_model, "src_token_list", None) is None:
@@ -442,12 +451,14 @@ class Speech2Text:
         md_x = []
         for i in range(self.st_model.model_num):
             assert len(enc[i]) == 1, len(enc[i])
-            if self.speech_attn[i]:
-                x.append(enc[0])
-                md_x.append(enc_mt[0])
-            else:
-                x.append(enc_mt[0])
+            if self.type[i] == "MultiDecoder-SpeechAttn":
+                x.append(enc[i])
+                md_x.append(enc_mt[i])
+            elif self.type[i] == "MultiDecoder" or self.type[i] == "BaseMT":
+                x.append(enc_mt[i])
                 md_x.append(None)
+            elif self.type[i] == "BaseST":
+                x.append(enc[i])
 
         mt_x = None
         if self.mt_model is not None:
