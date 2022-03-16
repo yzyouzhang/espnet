@@ -407,6 +407,8 @@ class BeamSearch(torch.nn.Module):
         """
         # set length bounds
         sample = x[0] if type(x) == list else x
+        import logging
+        logging.info("sample len: {}, sample[0]: {}".format(len(x), x[0]))
         if maxlenratio == 0:
             maxlen = sample.shape[0]
         elif maxlenratio < 0:
