@@ -8,6 +8,7 @@ from typing import Tuple
 import torch
 from typeguard import check_argument_types
 
+from espnet.nets.scorers.ctc import CTCPrefixScorer
 from espnet2.st.espnet_model_md import ESPnetSTMDModel
 from espnet2.st.decoder.ensemble_decoder import EnsembleDecoder
 from espnet2.train.abs_espnet_model import AbsESPnetModel
@@ -67,7 +68,7 @@ class ESPnetSTEnsemble(AbsESPnetModel):
         self.decoder = EnsembleDecoder(decoders, return_hidden=False)
         self.asr_decoder = asr_decoder
         self.asr_decoder_index = asr_decoder_index
-        self.ctc = ctc
+        self.ctc = CTCPrefixScorer(ctc=ctc, eos=self.src_eos)
 
     def forward(
         self,
