@@ -119,9 +119,12 @@ class ESPnetSTEnsemble(AbsESPnetModel):
         encoder_out_lens = []
 
         for model in self.models:
-            single_encoder_out, single_encoder_out_lens = model.mt_encoder(
-                asr_hs, asr_hs_lengths
-            )
+            if hasattr(model, "mt_encoder"):
+                single_encoder_out, single_encoder_out_lens = model.mt_encoder(
+                    asr_hs, asr_hs_lengths
+                )
+            else:
+                single_encoder_out, single_encoder_out_lens = None, None
             encoder_out.append(single_encoder_out)
             encoder_out_lens.append(single_encoder_out_lens)
 
