@@ -28,7 +28,7 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         self,
         decoders: List[Union[AbsDecoder, None]],
         weights: List[float] = None,
-        return_hidden: bool = False
+        return_hidden: bool = False,
     ):
         assert check_argument_types()
         super().__init__()
@@ -103,7 +103,6 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         states: List[Any],
         xs: Union[torch.Tensor, List[torch.Tensor]],
         speech: Optional[Union[torch.Tensor, List[torch.Tensor]]] = None,
-        return_hidden: Optional[bool] = False,
     ) -> Tuple[torch.Tensor, List[Any]]:
         """Score new token batch.
 
@@ -120,16 +119,13 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
         n_batch = len(states)
         n_decoders = len(self.decoders)
 
-        hs_list = []
         all_state_list = []
         logps = []
-        import logging
-        logging.info("decoder_num: {}, decoder_batch: {}, self.valid: {}, x: {}".format(n_decoders, n_batch, self.valid, len(xs)))
+
         decoder_index = 0
         for i in range(n_decoders):
             if self.decoders[i] is None:
                 all_state_list.append(None)
-                hs_list.append(None)
                 continue
             decoder_batch = [states[h][i] for h in range(n_batch)]
             if speech is not None and speech[i] is not None:
@@ -137,38 +133,21 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
                 logp, state_list = self.decoders[i].batch_score(
                     ys, decoder_batch, xs[i], speech[i]
                 )
-                hs = None
             else:
-                if self.return_hidden:
-                    logp, hs, state_list = self.decoders[i].batch_score(
-                        ys, decoder_batch, xs[i], return_hidden=self.return_hidden
-                    )
-                else:
-                    logp, state_list = self.decoders[i].batch_score(
-                        ys, decoder_batch, xs[i]
-                    )
-                    hs = None
-            hs_list.append(hs)
+                logp, state_list = self.decoders[i].batch_score(
+                    ys, decoder_batch, xs[i]
+                )
             all_state_list.append(state_list)
             logps.append(np.log(self.weights[decoder_index]) + logp)
         score = torch.logsumexp(torch.stack(logps, dim=0), dim=0)
 
         transpose_state_list = []
-        transpose_hs_list = []
         for i in range(n_batch):
             decoder_state = []
-            sub_hs = []
             for j in range(n_decoders):
                 if all_state_list[j] is not None:
-                    decoder_state.append(all_state_list[j][i]) 
+                    decoder_state.append(all_state_list[j][i])
                 else:
                     decoder_state.append(None)
-                if hs_list[j] is not None:
-                    sub_hs.append(hs_list[j][i])
-                else:
-                    sub_hs.append(None)
             transpose_state_list.append(decoder_state)
-            transpose_hs_list.append(transpose_hs_list)
-        if return_hidden:
-            return score, transpose_hs_list, transpose_state_list
         return score, transpose_state_list

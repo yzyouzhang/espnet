@@ -387,10 +387,9 @@ class Speech2Text:
                 md_asr_x = asr_enc[0]
 
             # c. Passed the encoder result and the beam search
-            x = []
-            for i in range(self.st_model.model_num):
-                assert len(enc[i]) == 1, len(enc[i])
-                x.append(enc[i][0])
+            selected_encoder_id = self.st_model.asr_decoder_index
+            assert len(enc[selected_encoder_id]) == 1, len(enc[selected_encoder_id])
+            x = enc[selected_encoder_id][0]
 
             asr_nbest_hyps = self.asr_beam_search(
                 x=x,
