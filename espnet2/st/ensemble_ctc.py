@@ -1,6 +1,7 @@
 """ScorerInterface implementation for CTC."""
 
 from typing import List
+from typing import Union
 
 import numpy as np
 import torch
@@ -14,7 +15,7 @@ class EnsembleCTC(BatchPartialScorerInterface):
 
     def __init__(
         self,
-        ctc: List[torch.nn.Module],
+        ctc: List[Union[torch.nn.Module, None]],
         eos: int,
         weights: List[float] = None,
     ):
@@ -27,16 +28,18 @@ class EnsembleCTC(BatchPartialScorerInterface):
             weights (List[flost]): weights for CTC ensembling
 
         """
+        self.ctc_src = torch.nn.ModuleList(ctc) # register
+
         ctc_list = []
         self.valid = 0
-
         for module in ctc:
             if module is not None:
                 self.valid += 1
                 ctc_list.append(CTCPrefixScorer(ctc=module, eos=eos))
             else:
                 ctc_list.append(None)
-        self.ctc = torch.nn.ModuleList(ctc_list)
+        self.ctc = ctc_list
+        
         self.eos = eos
         self.ctc_num = len(ctc)
         self.weights = [1 / self.valid] * self.valid if weights is None else weights
@@ -52,6 +55,8 @@ class EnsembleCTC(BatchPartialScorerInterface):
         """
 
         initial_states = []
+        import logging
+        logging.info("x.shape {}, self.ctc {}".format(len(x), self.ctc_num))
         for i in range(self.ctc_num):
             if self.ctc[i] is None:
                 initial_states.append(None)
@@ -119,6 +124,8 @@ class EnsembleCTC(BatchPartialScorerInterface):
         Returns: initial state
 
         """
+        import logging
+        logging.info("x.shape {}, self.ctc {}".format(len(x), self.ctc_num))
         for i in range(self.ctc_num):
             if self.ctc[i] is None:
                 continue
