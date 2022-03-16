@@ -380,13 +380,20 @@ class Speech2Text:
                 )
             ]
         else:
+            # Note (jiatong): does not support multiple asr for now
             md_asr_x = None
             if self.asr_model is not None:
                 asr_enc, _ = self.asr_model.encode(**batch)
                 md_asr_x = asr_enc[0]
+
             # c. Passed the encoder result and the beam search
+            x = []
+            for i in range(self.st_model.model_num):
+                assert len(enc[i]) == 1, len(enc[i])
+                x.append(enc[i][0])
+
             asr_nbest_hyps = self.asr_beam_search(
-                x=enc[0],
+                x=x,
                 maxlenratio=self.md_maxlenratio,
                 minlenratio=self.md_minlenratio,
                 md_asr_x=md_asr_x,
@@ -435,7 +442,7 @@ class Speech2Text:
         x = []
         md_x = []
         for i in range(self.st_model.model_num):
-            len(enc[i]) == 1, len(enc[i])
+            assert len(enc[i]) == 1, len(enc[i])
             if self.speech_attn[i]:
                 x.append(enc[0])
                 md_x.append(enc_mt[0])

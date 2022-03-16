@@ -42,6 +42,7 @@ class EnsembleCTC(BatchPartialScorerInterface):
         
         self.eos = eos
         self.ctc_num = len(ctc)
+        # FIXME (jiatong): weight may not be a good indicator of using CTC
         self.weights = [1 / self.valid] * self.valid if weights is None else weights
 
     def init_state(self, x: List[torch.Tensor]):
@@ -109,10 +110,12 @@ class EnsembleCTC(BatchPartialScorerInterface):
                 sub_tscore, sub_state = self.ctc[i].score_partial(
                     y, ids, state[i], x[i]
                 )
-                tscores.append(np.log(self.weights[i]) + sub_tscore)
+               
+                # tscores.append(np.log(self.weights[i]) + sub_tscore)
+                tscore.append(sub_tscore)
                 sub_states.append(sub_state)
 
-        return torch.logsumexp(torch.stack(tscores, dim=0), dim=0), sub_states
+        return torch.logsumexp(torch.stack(tscores, dim=0) + np.log(len(tscores)), dim=0), sub_states
 
     def batch_init_state(self, x: List[torch.Tensor]):
         """Get an initial state for decoding.
@@ -154,13 +157,19 @@ class EnsembleCTC(BatchPartialScorerInterface):
             if self.ctc[i] is None:
                 new_states.append(None)
             else:
+                import logging
+                logging.info("state: {}".format(len(state)))
+                if state[j] is None:
+                    new_states.append(None)
+                    continue
                 state_ctc = [state[j][i] for j in range(len(state))]
                 sub_score, new_state_ctc = self.ctc[i].batch_score_partial(
                     y, ids, state_ctc, x[i]
                 )
-                scores.append(np.log(self.weights[i]) + sub_score)
+                scores.append(sub_score)
+                # scores.append(np.log(self.weights[i]) + sub_score)
                 new_states.append(new_state_ctc)
-        score = torch.logsumexp(torch.stack(scores, dim=0), dim=0)
+        score = torch.logsumexp(torch.stack(scores, dim=0) + np.log(len(scores)), dim=0)
 
         # transpose state
         transpose_state_list = []
