@@ -64,14 +64,13 @@ class ESPnetSTEnsemble(AbsESPnetModel):
         src_eos = -1
         for model in self.models:
             if hasattr(model, "ctc"):
-                ctcs.apppend(model.ctc)
-                src_eos = model.src_eos
+                ctcs.append(model.ctc)
             else:
                 ctcs.append(None)
 
         self.decoder = EnsembleDecoder(decoders)
         self.asr_decoder = EnsembleDecoder(asr_decoders)
-        self.ctc = EnsembleCTC(ctcs, src_eos)
+        self.ctc = EnsembleCTC(ctcs, self.src_eos)
 
     def forward(
         self,

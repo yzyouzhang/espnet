@@ -26,7 +26,7 @@ class EnsembleDecoder(AbsDecoder, BatchScorerInterface):
 
     def __init__(
         self,
-        decoders: List[AbsDecoder],
+        decoders: List[Union[AbsDecoder, None]],
         weights: List[float] = None,
     ):
         assert check_argument_types()

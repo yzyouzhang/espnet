@@ -54,10 +54,10 @@ class Speech2Text:
 
     def __init__(
         self,
-        st_train_config: Union[Path, str] = None,
-        st_model_file: Union[Path, str] = None,
-        mt_train_config: Union[Path, str] = None,
-        mt_file: Union[Path, str] = None,
+        st_train_config: Union[Path, str, List[str]] = None,
+        st_model_file: Union[Path, str, List[str]] = None,
+        mt_train_config: Union[Path, str, List[str]] = None,
+        mt_file: Union[Path, str, List[str]] = None,
         lm_train_config: Union[Path, str] = None,
         lm_file: Union[Path, str] = None,
         md_lm_train_config: Union[Path, str] = None,
@@ -351,7 +351,7 @@ class Speech2Text:
 
         # b. Forward Encoder
         enc, enc_lens = self.st_model.encode(**batch)
-        assert len(enc) == 1, len(enc)
+        # assert len(enc) == 1, len(enc)
 
         if src_text is not None:
             # data: (Nsamples,) -> (1, Nsamples)
@@ -435,6 +435,7 @@ class Speech2Text:
         x = []
         md_x = []
         for i in range(self.st_model.model_num):
+            len(enc[i]) == 1, len(enc[i])
             if self.speech_attn[i]:
                 x.append(enc[0])
                 md_x.append(enc_mt[0])
@@ -539,12 +540,12 @@ def inference_md(
     log_level: Union[int, str],
     data_path_and_name_and_type: Sequence[Tuple[str, str, str]],
     key_file: Optional[str],
-    st_train_config: Optional[str],
-    st_model_file: Optional[str],
-    mt_train_config: Optional[str],
-    mt_file: Optional[str],
-    md_asr_train_config: Optional[str],
-    md_asr_file: Optional[str],
+    st_train_config: Optional[Union[str, List[str]]],
+    st_model_file: Optional[Union[str, List[str]]],
+    mt_train_config: Optional[Union[str, List[str]]],
+    mt_file: Optional[Union[str, List[str]]],
+    md_asr_train_config: Optional[Union[str, List[str]]],
+    md_asr_file: Optional[Union[str, List[str]]],
     md_lm_train_config: Optional[str],
     md_lm_file: Optional[str],
     lm_train_config: Optional[str],
