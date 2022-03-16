@@ -113,15 +113,15 @@ class Speech2Text:
 
         decoder = st_model.decoder
         self.type = []
-        for i in range(len(st_model.model_num):
-            if isinstance(self.st_model.models[i], ESPnetSTMDModel):
-                if isinstance(self.decoders[i], TransformerMDDecoder):
+        for i in range(st_model.model_num):
+            if isinstance(st_model.models[i], ESPnetSTMDModel):
+                if isinstance(decoder[i], TransformerMDDecoder):
                     self.type.append("MultiDecoder-SpeechAttn")
                 else:
                     self.type.append("MultiDecoder")
-            elif isinstance(self.st_model.models[i], ESPnetSTModel):
+            elif isinstance(st_model.models[i], ESPnetSTModel):
                 self.type.append("BaseST")
-            elif isinstance(self.st_model.models[i], ESPnetMTModel):
+            elif isinstance(st_model.models[i], ESPnetMTModel):
                 self.type.append("BaseMT")
             else:
                 raise ValueError("Not supported model type {}".format(type(self.st_model.models[i])))
