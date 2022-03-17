@@ -377,6 +377,7 @@ class Speech2Text:
                 self.st_model.ignore_id,
             )
             src_text_in_lens = src_text_lengths + 1
+
             decoder_out, _, hs_dec_asr = self.st_model.asr_decoder(
                 enc[selected_encoder_id], enc_lens[selected_encoder_id], src_text_in, src_text_in_lens, return_hidden=True
             )
@@ -440,12 +441,37 @@ class Speech2Text:
 
         # Currently only support nbest 1
         asr_src_text = asr_results[0][0]
-        asr_hs = asr_results[0][-1].unsqueeze(0)
-        asr_hs = to_device(asr_hs, device=self.device)
-        asr_hs_lengths = asr_hs.new_full(
-            [1], dtype=torch.long, fill_value=asr_hs.size(1)
+        # Extract hs for each asr_decoder
+        asr_src_token = torch.tensor(asr_results[0][2])
+        asr_src_token= to_device(asr_src_token, device=self.device)
+        asr_hs = []
+        asr_src_token = asr_src_token.unsqueeze(0)
+        asr_src_token_lengths = asr_src_token.new_full(
+            [1], dtype=torch.long, fill_value=asr_src_token.size(1)
         )
-        enc_mt, enc_mt_lengths = self.st_model.encoder_mt(asr_hs, asr_hs_lengths)
+        asr_src_token_in, _ = add_sos_eos(
+            asr_src_token_in,
+            self.st_model.src_sos,
+            self.st_model.src_eos,
+            self.st_model.ignore_id,
+        )
+        asr_src_token_in_lens = asr_src_token_lengths + 1
+        for i in range(self.st_model.model_num):
+            if self.st_model.asr_decoder_all[i] is not None:
+                asr_hs.append(None)
+            else:
+                _, _, hs_dasr = self.st_model.asr_decoder_all[i](
+                    enc[i], enc_lens[i], asr_src_token_in, asr_src_token_in_lens, return_hidden=True
+                )
+                asr_hs.append(hs_dasr[0])
+
+        # asr_hs = asr_results[0][-1].unsqueeze(0)
+        asr_hs = [hs_dasr.unsuqeeze[0] if hs_dasr is not None else None for hs_dasr in asr_hs]
+        asr_hs = to_device(asr_hs, device=self.device)
+        asr_hs_lengths = [asr_hs[i].new_full(
+            [1], dtype=torch.long, fill_value=asr_hs[i].size(1)
+        ) if asr_hs[i] is not None else None for i in range(len(asr_hs))]
+        enc_mt, _ = self.st_model.encoder_mt(asr_hs, asr_hs_lengths)
 
         x = []
         md_x = []

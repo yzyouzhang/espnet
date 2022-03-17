@@ -54,12 +54,15 @@ class ESPnetSTEnsemble(AbsESPnetModel):
         # add asr decoder
         # FIXME(jiatong): just use one asr encoder
         asr_decoder_index = -1
+        asr_decoder_all = []
         for i in range(len(self.models)):
             model = self.models[i]
             if hasattr(model, "asr_decoder"):
                 asr_decoder = model.asr_decoder
                 asr_decoder_index = i
-                break
+                asr_decoder_all.append(model.asr_decoder)
+            else:
+                asr_decoder_all.append(None)
 
         # add ctc decoder
         # FIXME(jiatong): just use one CTC
@@ -67,6 +70,7 @@ class ESPnetSTEnsemble(AbsESPnetModel):
 
         self.decoder = EnsembleDecoder(decoders, return_hidden=False)
         self.asr_decoder = asr_decoder
+        self.asr_decoder_all = asr_decoder_all
         self.asr_decoder_index = asr_decoder_index
         self.ctc = CTCPrefixScorer(ctc=ctc, eos=self.src_eos)
 
@@ -112,17 +116,18 @@ class ESPnetSTEnsemble(AbsESPnetModel):
         return encoder_out, encoder_out_lens
 
     def encoder_mt(
-        self, asr_hs: torch.Tensor, asr_hs_lengths: torch.Tensor
+        self, asr_hs: List[torch.Tensor], asr_hs_lengths: List[torch.Tensor]
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         # TODO (jiatong) add function description
         # assume only one asr
         encoder_out = []
         encoder_out_lens = []
 
-        for model in self.models:
-            if hasattr(model, "encoder_mt"):
+        for i in range(self.model_num):
+            model = self.models[i]
+            if hasattr(model, "encoder_mt") and asr_hs[i] is not None:
                 single_encoder_out, single_encoder_out_lens, _ = model.encoder_mt(
-                    asr_hs, asr_hs_lengths
+                    asr_hs[i], asr_hs_lengths[i]
                 )
             else:
                 single_encoder_out, single_encoder_out_lens = None, None
