@@ -19,7 +19,7 @@ class LinearDecoder(AbsDecoder):
             input (torch.Tensor): hidden_space [Batch, T, F]
             ilens (torch.Tensor): input lengths [Batch]
         """
-        input = torch.sum(input, dim=1)
+        input = torch.mean(input, dim=1)
         output = self.linear_decoder(input)
 
         return output

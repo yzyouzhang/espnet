@@ -21,12 +21,12 @@ from espnet2.asr.encoder.hubert_encoder import (
     FairseqHubertEncoder,
     FairseqHubertPretrainEncoder,
 )
+
 from espnet2.asr.encoder.longformer_encoder import LongformerEncoder
 from espnet2.asr.encoder.rnn_encoder import RNNEncoder
 from espnet2.asr.encoder.transformer_encoder import TransformerEncoder
 from espnet2.asr.encoder.vgg_rnn_encoder import VGGRNNEncoder
 from espnet2.asr.encoder.wav2vec2_encoder import FairSeqWav2Vec2Encoder
-from espnet2.asvspoof.espnet_model import ESPnetASVSpoofModel
 from espnet2.asr.frontend.abs_frontend import AbsFrontend
 from espnet2.asr.frontend.default import DefaultFrontend
 from espnet2.asr.frontend.fused import FusedFrontends
@@ -38,6 +38,9 @@ from espnet2.asr.preencoder.linear import LinearProjection
 from espnet2.asr.preencoder.sinc import LightweightSincConvs
 from espnet2.asr.specaug.abs_specaug import AbsSpecAug
 from espnet2.asr.specaug.specaug import SpecAug
+from espnet2.asvspoof.espnet_model import ESPnetASVSpoofModel
+from espnet2.asvspoof.loss.abs_loss import AbsASVSpoofLoss
+from espnet2.asvspoof.loss.binary_loss import ASVSpoofBinaryLoss
 from espnet2.layers.abs_normalize import AbsNormalize
 from espnet2.layers.global_mvn import GlobalMVN
 from espnet2.layers.utterance_mvn import UtteranceMVN
@@ -122,10 +125,10 @@ decoder_choices = ClassChoices(
 losses_choices = ClassChoices(
     name="losses",
     classes=dict(
-        sigmoid_loss=ASVSpoofBinaryLoss,
+        binary_loss=ASVSpoofBinaryLoss,
     ),
     type_check=AbsASVSpoofLoss,
-    default=None
+    default=None,
 )
 
 
@@ -236,7 +239,7 @@ class ASVSpoofTask(AbsTask):
         cls, train: bool = True, inference: bool = False
     ) -> Tuple[str, ...]:
         if not inference:
-            retval = ("speech", "labels")
+            retval = ("speech", "label")
         else:
             # Recognition mode
             retval = ("speech",)
