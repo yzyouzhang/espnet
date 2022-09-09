@@ -12,9 +12,11 @@ from packaging.version import parse as V
 from typeguard import check_argument_types
 
 from espnet2.asr.encoder.abs_encoder import AbsEncoder
+from espnet2.asr.preencoder.abs_preencoder import AbsPreEncoder
 from espnet2.asr.frontend.abs_frontend import AbsFrontend
 from espnet2.asr.specaug.abs_specaug import AbsSpecAug
 from espnet2.asvspoof.decoder.abs_decoder import AbsDecoder
+from espnet2.asvspoof.loss.abs_loss import AbsASVSpoofLoss
 from espnet2.layers.abs_normalize import AbsNormalize
 from espnet2.torch_utils.device_funcs import force_gatherable
 from espnet2.train.abs_espnet_model import AbsESPnetModel
@@ -41,13 +43,15 @@ class ESPnetASVSpoofModel(AbsESPnetModel):
         specaug: Optional[AbsSpecAug],
         normalize: Optional[AbsNormalize],
         encoder: AbsEncoder,
+        preencoder: Optional[AbsPreEncoder],
         decoder: AbsDecoder,
-        losses: Dict[str, AbsDiarLoss],
+        losses: Dict[str, AbsASVSpoofLoss],
     ):
         assert check_argument_types()
 
         super().__init__()
 
+        self.preencoder = preencoder
         self.encoder = encoder
         self.normalize = normalize
         self.frontend = frontend
@@ -78,7 +82,9 @@ class ESPnetASVSpoofModel(AbsESPnetModel):
         # 2. Decoder (baiscally a predction layer after encoder_out)
         pred = self.decoder(encoder_out, encoder_out_lens)
 
-        loss = self.losses["binary_loss"](pred, label)
+        loss = (
+            self.losses["binary_loss"](pred, label) + self.losses["binary_loss"].weight
+        )
 
         acc = ((pred > 0.5) == (label > 0.5)) / batch_size
 
@@ -105,8 +111,6 @@ class ESPnetASVSpoofModel(AbsESPnetModel):
         self,
         speech: torch.Tensor,
         speech_lengths: torch.Tensor,
-        bottleneck_feats: torch.Tensor,
-        bottleneck_feats_lengths: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Frontend + Encoder
 
@@ -127,6 +131,10 @@ class ESPnetASVSpoofModel(AbsESPnetModel):
             if self.normalize is not None:
                 feats, feats_lengths = self.normalize(feats, feats_lengths)
 
+            # Pre-encoder, e.g. used for raw input data
+            if self.preencoder is not None:
+                feats, feats_lengths = self.preencoder(feats, feats_lengths)
+
             # 4. Forward encoder
             # feats: (Batch, Length, Dim)
             # -> encoder_out: (Batch, Length2, Dim)
@@ -137,7 +145,7 @@ class ESPnetASVSpoofModel(AbsESPnetModel):
             speech.size(0),
         )
         assert encoder_out.size(1) <= encoder_out_lens.max(), (
-            encoder_out.size(),
+            encoder_out.size(), 
             encoder_out_lens.max(),
         )
 

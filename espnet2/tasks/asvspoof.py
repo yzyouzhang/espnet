@@ -148,8 +148,6 @@ class ASVSpoofTask(AbsTask):
         preencoder_choices,
         # --encoder and --encoder_conf
         encoder_choices,
-        # --postencoder and --postencoder_conf
-        postencoder_choices,
         # --decoder and --decoder_conf
         decoder_choices,
     ]
@@ -256,18 +254,6 @@ class ASVSpoofTask(AbsTask):
     @classmethod
     def build_model(cls, args: argparse.Namespace) -> ESPnetASVSpoofModel:
         assert check_argument_types()
-        if isinstance(args.token_list, str):
-            with open(args.token_list, encoding="utf-8") as f:
-                token_list = [line.rstrip() for line in f]
-
-            # Overwriting token_list to keep it as "portable".
-            args.token_list = list(token_list)
-        elif isinstance(args.token_list, (tuple, list)):
-            token_list = list(args.token_list)
-        else:
-            raise RuntimeError("token_list must be str or list")
-        vocab_size = len(token_list)
-        logging.info(f"Vocabulary size: {vocab_size }")
 
         # 1. frontend
         if args.input_size is None:
@@ -308,6 +294,7 @@ class ASVSpoofTask(AbsTask):
         # 4. Encoder
         encoder_class = encoder_choices.get_class(args.encoder)
         encoder = encoder_class(input_size=input_size, **args.encoder_conf)
+        encoder_output_size = encoder.output_size()
 
         # 5. Decoder
         decoder_class = decoder_choices.get_class(args.decoder)
@@ -317,6 +304,15 @@ class ASVSpoofTask(AbsTask):
             **args.decoder_conf,
         )
 
+        # 6. Loss definition
+        losses = {}
+        if getattr(args, "losses", None) is not None:
+            # This check is for the compatibility when load models
+            # that packed by older version
+            for ctr in args.losses:
+                loss = losses_choices.get_class(ctr["name"])(**ctr["conf"])
+                losses[ctr["name"]] = loss
+
         # 7. Build model
         model = ESPnetASVSpoofModel(
             frontend=frontend,
@@ -325,7 +321,7 @@ class ASVSpoofTask(AbsTask):
             preencoder=preencoder,
             encoder=encoder,
             decoder=decoder,
-            **args.model_conf,
+            losses=losses,
         )
 
         # FIXME(kamo): Should be done in model?
