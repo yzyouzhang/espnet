@@ -43,7 +43,6 @@ local_data_opts= # The options given to local/data.sh.
 # Feature extraction related
 audio_format=flac    # Audio format: wav, flac, wav.ark, flac.ark.
 fs=8k                # Sampling rate.
-min_wav_duration=0.1 # Minimum duration in second
 
 # asvspoof model related
 asvspoof_tag=    # Suffix to the result dir for asvspoof model training.
@@ -62,9 +61,6 @@ inference_tag=    # Suffix to the inference dir for asvspoof model inference
 train_set=       # Name of training set.
 valid_set=       # Name of development set.
 test_sets=       # Names of evaluation sets. Multiple items can be specified.
-asvspoof_speech_fold_length=800 # fold_length for speech data during asvspoof training
-                            # Typically, the label also follow the same fold length
-lang=noinfo      # The language type of corpus.
 
 
 help_message=$(cat << EOF
@@ -92,8 +88,6 @@ Options:
     # Feature extraction related
     --audio_format     # Audio format: wav, flac, wav.ark, flac.ark  (default="${audio_format}").
     --fs               # Sampling rate (default="${fs}").
-    --min_wav_duration # Minimum duration in second (default="${min_wav_duration}").
-
 
     # ASVSpoof model related
     --asvspoof_tag        # Suffix to the result dir for asvspoofization model training (default="${asvspoof_tag}").
@@ -111,7 +105,6 @@ Options:
     --train_set               # Name of training set (required).
     --valid_set               # Name of development set (required).
     --test_sets               # Names of evaluation sets (required).
-    --asvspoof_speech_fold_length # fold_length for speech data during asvspoofization training  (default="${asvspoof_speech_fold_length}").
 EOF
 )
 
@@ -140,9 +133,9 @@ data_feats=${dumpdir}
 # Set tag for naming of model directory
 if [ -z "${asvspoof_tag}" ]; then
     if [ -n "${asvspoof_config}" ]; then
-        asvspoof_tag="$(basename "${asvspoof_config}" .yaml)_${feats_type}"
+        asvspoof_tag="$(basename "${asvspoof_config}" .yaml)"
     else
-        asvspoof_tag="train_${feats_type}"
+        asvspoof_tag="train"
     fi
 fi
 
@@ -180,50 +173,16 @@ if ! "${skip_data_prep}"; then
         # If nothing is need, then format_wav_scp.sh does nothing:
         # i.e. the input file format and rate is same as the output.
         for dset in "${train_set}" "${valid_set}" ${test_sets}; do
-            if [ "${dset}" = "${train_set}" ] || [ "${dset}" = "${valid_set}" ]; then
-                _suf="/org"
-            else
-                _suf=""
-            fi
-            utils/copy_data_dir.sh --validate_opts --non-print data/"${dset}" "${data_feats}${_suf}/${dset}"
-            rm -f ${data_feats}${_suf}/${dset}/{wav.scp,reco2file_and_channel}
+            utils/copy_data_dir.sh --validate_opts --non-print data/"${dset}" "${data_feats}/${dset}"
+            rm -f ${data_feats}/${dset}/{wav.scp,reco2file_and_channel}
 
             # shellcheck disable=SC2086
             scripts/audio/format_wav_scp.sh --nj "${nj}" --cmd "${train_cmd}" \
                 --audio-format "${audio_format}" --fs "${fs}"  \
-                "data/${dset}/wav.scp" "${data_feats}${_suf}/${dset}"
-            echo "${feats_type}" > "${data_feats}${_suf}/${dset}/feats_type"
-
-        done
-    fi
-
-
-    if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
-        log "Stage 3: Remove short data: ${data_feats}/org -> ${data_feats}"
-
-        for dset in "${train_set}" "${valid_set}"; do
-        # NOTE: Not applying to test_sets to keep original data
-
-            # Copy data dir
-            utils/copy_data_dir.sh "${data_feats}/org/${dset}" "${data_feats}/${dset}"
-            cp "${data_feats}/org/${dset}/feats_type" "${data_feats}/${dset}/feats_type"
-
-            _fs=$(python3 -c "import humanfriendly as h;print(h.parse_size('${fs}'))")
-            _min_length=$(python3 -c "print(int(${min_wav_duration} * ${_fs}))")
-
-            # utt2num_samples is created by format_wav_scp.sh
-            # asvspoofization typically accept long recordings, so does not has
-            # max length requirements
-            <"${data_feats}/org/${dset}/utt2num_samples" \
-                awk -v min_length="${_min_length}" \
-                    '{ if ($2 > min_length ) print $0; }' \
-                    >"${data_feats}/${dset}/utt2num_samples"
-            <"${data_feats}/org/${dset}/wav.scp" \
-                utils/filter_scp.pl "${data_feats}/${dset}/utt2num_samples"  \
-                >"${data_feats}/${dset}/wav.scp"
-
-            # fix_data_dir.sh leaves only utts which exist in all files
-            utils/fix_data_dir.sh "${data_feats}/${dset}"
+                "data/${dset}/wav.scp" "${data_feats}/${dset}"
+            
+            # Note(jiatong): default use raw as feats_type, see more types in other TEMPLATE recipes
+            echo "raw" > "${data_feats}/${dset}/feats_type"
 
         done
     fi
@@ -236,10 +195,10 @@ fi
 
 
 if ! "${skip_train}"; then
-    if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
+    if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
         _asvspoof_train_dir="${data_feats}/${train_set}"
         _asvspoof_valid_dir="${data_feats}/${valid_set}"
-        log "Stage 4: ASVSpoof collect stats: train_set=${_asvspoof_train_dir}, valid_set=${_asvspoof_valid_dir}"
+        log "Stage 3: ASVSpoof collect stats: train_set=${_asvspoof_train_dir}, valid_set=${_asvspoof_valid_dir}"
 
         _opts=
         if [ -n "${asvspoof_config}" ]; then
@@ -315,10 +274,10 @@ if ! "${skip_train}"; then
 
     fi
 
-    if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
+    if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
         _asvspoof_train_dir="${data_feats}/${train_set}"
         _asvspoof_valid_dir="${data_feats}/${valid_set}"
-        log "Stage 5: ASVSpoof Training: train_set=${_asvspoof_train_dir}, valid_set=${_asvspoof_valid_dir}"
+        log "Stage 4: ASVSpoof Training: train_set=${_asvspoof_train_dir}, valid_set=${_asvspoof_valid_dir}"
 
         _opts=
         if [ -n "${asvspoof_config}" ]; then
@@ -335,7 +294,6 @@ if ! "${skip_train}"; then
         else
             _type=sound
         fi
-        _fold_length="$((asvspoof_speech_fold_length * 100))"
         _opts+="--frontend_conf fs=${fs} "
 
         if [ "${feats_normalize}" = global_mvn ]; then
@@ -354,7 +312,6 @@ if ! "${skip_train}"; then
         log "Generate '${asvspoof_exp}/run.sh'. You can resume the process from stage 5 using this script"
         mkdir -p "${asvspoof_exp}"; echo "${run_args} --stage 5 \"\$@\"; exit \$?" > "${asvspoof_exp}/run.sh"; chmod +x "${asvspoof_exp}/run.sh"
 
-        # NOTE(kamo): --fold_length is used only if --batch_type=folded and it's ignored in the other case
         log "ASVSpoof training started... log: '${asvspoof_exp}/train.log'"
         if echo "${cuda_cmd}" | grep -e queue.pl -e queue-freegpu.pl &> /dev/null; then
             # SGE can't include "/" in a job name
@@ -374,8 +331,6 @@ if ! "${skip_train}"; then
             ${python} -m espnet2.bin.asvspoof_train \
                 --use_preprocessor true \
                 --resume true \
-                --fold_length "${_fold_length}" \
-                --fold_length "${asvspoof_speech_fold_length}" \
                 --output_dir "${asvspoof_exp}" \
                 ${_opts} ${asvspoof_args}
 
@@ -385,8 +340,8 @@ else
 fi
 
 if ! "${skip_eval}"; then
-    if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
-        log "Stage 6: Predict with models: training_dir=${asvspoof_exp}"
+    if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
+        log "Stage 5: Predict with models: training_dir=${asvspoof_exp}"
 
         if ${gpu_inference}; then
             _cmd=${cuda_cmd}
@@ -429,11 +384,10 @@ if ! "${skip_eval}"; then
             ${_cmd} --gpu "${_ngpu}" JOB=1:"${_nj}" "${_logdir}"/asvspoof_inference.JOB.log \
                 ${python} -m espnet2.bin.asvspoof_inference \
                     --ngpu "${_ngpu}" \
-                    --fs "${fs}" \
                     --data_path_and_name_and_type "${_data}/${_scp},speech,${_type}" \
                     --key_file "${_logdir}"/keys.JOB.scp \
-                    --train_config "${asvspoof_exp}"/config.yaml \
-                    --model_file "${asvspoof_exp}"/"${inference_model}" \
+                    --asvspoof_train_config "${asvspoof_exp}"/config.yaml \
+                    --asvspoof_model_file "${asvspoof_exp}"/"${inference_model}" \
                     --output_dir "${_logdir}"/output.JOB \
                     ${_opts} || { cat $(grep -l -i error "${_logdir}"/asvspoof_inference.*.log) ; exit 1; }
 
@@ -445,8 +399,8 @@ if ! "${skip_eval}"; then
         done
     fi
 
-    if [ ${stage} -le 7 ] && [ ${stop_stage} -ge 7 ]; then
-        log "Stage 7: Scoring"
+    if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
+        log "Stage 6: Scoring"
         _cmd=${decode_cmd}
 
         for dset in "${valid_set}" ${test_sets}; do

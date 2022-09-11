@@ -1,5 +1,6 @@
 import torch
 
+from typing import Optional
 from espnet2.asvspoof.decoder.abs_decoder import AbsDecoder
 
 
@@ -13,7 +14,7 @@ class LinearDecoder(AbsDecoder):
         super().__init__()
         self.linear_decoder = torch.nn.Linear(encoder_output_size, 1)
 
-    def forward(self, input: torch.Tensor, ilens: torch.Tensor):
+    def forward(self, input: torch.Tensor, ilens: Optional[torch.Tensor]):
         """Forward.
         Args:
             input (torch.Tensor): hidden_space [Batch, T, F]

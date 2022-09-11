@@ -6,6 +6,7 @@ from itertools import permutations
 from typing import Dict, Optional, Tuple
 
 import numpy as np
+import logging
 import torch
 import torch.nn.functional as F
 from packaging.version import parse as V
@@ -86,7 +87,7 @@ class ESPnetASVSpoofModel(AbsESPnetModel):
             self.losses["binary_loss"](pred, label) + self.losses["binary_loss"].weight
         )
 
-        acc = ((pred > 0.5) == (label > 0.5)) / batch_size
+        acc = torch.sum(((pred.view(-1) > 0.0) == (label.view(-1) > 0.5))) / batch_size
 
         stats = dict(
             loss=loss.detach(),

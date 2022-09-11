@@ -1,5 +1,5 @@
 import torch
-import logging
+
 from espnet.nets.pytorch_backend.nets_utils import to_device
 from espnet2.asvspoof.loss.abs_loss import AbsASVSpoofLoss
 
@@ -13,6 +13,7 @@ class ASVSpoofBinaryLoss(AbsASVSpoofLoss):
     ):
         super().__init__()
         self.weight = weight
+        self.sigmoid = torch.nn.Sigmoid()
         self.loss = torch.nn.BCELoss(reduction="mean")
 
     def forward(self, pred: torch.Tensor, label: torch.Tensor):
@@ -21,7 +22,5 @@ class ASVSpoofBinaryLoss(AbsASVSpoofLoss):
             pred  (torch.Tensor): prediction probability [Batch, 2]
             label (torch.Tensor): ground truth label [Batch, 2]
         """
-        logging.info(pred)
-        logging.info(label)
-        loss = self.loss(pred.view(-1), label.view(-1).float())
+        loss = self.loss(self.sigmoid(pred.view(-1)), label.view(-1).float())
         return loss

@@ -15,11 +15,13 @@ inference_config=conf/decode_asvspoof.yaml
 
 
 ./asvspoof.sh \
-    --stage 4 \
+    --stage 1 \
     --ngpu 1 \
     --local_data_opts "--stage 1" \
     --asvspoof_config "${asvspoof_config}" \
     --inference_config "${inference_config}" \
+    --gpu_inference true \
+    --inference_nj 1 \
     --train_set "${train_set}" \
     --valid_set "${train_dev}" \
     --test_sets "${test_set}" "$@"
