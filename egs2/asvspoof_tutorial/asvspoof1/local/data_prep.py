@@ -14,9 +14,9 @@ if __name__ == "__main__":
 
     src_wav_path = os.path.join(args.src_folder, "{}".format(args.subset))
     if args.subset == "train":
-        src_label_path = os.path.join(args.src_folder, "ASVspoof2019.LA.cm.{}.trn.txt".format(args.subset))
+        src_label_path = os.path.join(args.src_folder, "ASVspoof2019.LA.cm.espnet_{}.trn.txt".format(args.subset))
     else:
-        src_label_path = os.path.join(args.src_folder, "ASVspoof2019.LA.cm.{}.trl.txt".format(args.subset))
+        src_label_path = os.path.join(args.src_folder, "ASVspoof2019.LA.cm.espnet_{}.trl.txt".format(args.subset))
     src_label = open(src_label_path, "r", encoding="utf-8")
     if not os.path.exists(args.tgt):
         os.makedirs(args.tgt)
