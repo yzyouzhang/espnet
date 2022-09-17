@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    src_wav_path = os.path.join(args.src_folder, "{}".format(args.subset))
+    src_wav_path = os.path.join(args.src_folder, "espnet_{}".format(args.subset))
     if args.subset == "train":
         src_label_path = os.path.join(args.src_folder, "ASVspoof2019.LA.cm.espnet_{}.trn.txt".format(args.subset))
     else:
